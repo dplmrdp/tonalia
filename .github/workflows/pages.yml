@@ -26,7 +26,8 @@ jobs:
       - name: Escribir config.js con la URL del Worker
         env:
           WORKER_URL: ${{ vars.WORKER_URL }}
-        run: echo "window.TONALIA_CONFIG = { workerUrl: '${WORKER_URL}' };" > web/config.js
+        run: |
+          echo "window.TONALIA_CONFIG = { workerUrl: '${WORKER_URL}' };" > web/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
