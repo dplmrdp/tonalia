@@ -8,7 +8,8 @@ App web para aprender a cantar. Subes una canción, separa la voz, marca sus not
 
 ```
 web/                 La app (se publica en GitHub Pages)
-  index.html         Toda la app: interfaz, detección de tono (YIN) y piano-roll
+  index.html         Toda la app: interfaz, detección de tono (YIN + Viterbi) y piano-roll
+  letra-worker.js    Transcripción de la letra con Whisper en el navegador
   config.js          URL del servidor de separación (la escribe la Action al publicar)
   manifest.webmanifest, sw.js, icon.svg   Instalable en el móvil y usable sin conexión
 worker/              Servidor de separación (Cloudflare Worker → Replicate/Demucs)
@@ -56,5 +57,7 @@ Abre http://localhost:8000. El micrófono y la instalación como app solo funcio
 ## Hoja de ruta
 
 - [x] Subir canción, separar voz y marcar notas
+- [x] Limpieza del tono (Suave / Normal / Fuerte)
+- [x] Letra con tiempos (Whisper base o small, gratis en el navegador)
 - [ ] Modo práctica con micrófono (más agudo / más grave en tiempo real)
 - [ ] Juego de repetir secuencias de notas

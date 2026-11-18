@@ -139,6 +139,18 @@ canvas { display: block; width: 100%; height: 340px; touch-action: pan-y; cursor
 .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
 .chip { flex: none; font-family: var(--f-mono); font-size: .8rem; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); }
 .chip.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.lyr-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; }
+.lyr-head h3 { font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; margin: 0 auto 0 0; }
+select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.lyrics { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; position: relative; }
+.lyrics button { width: 100%; text-align: left; border: none; background: none; padding: 7px 8px; display: grid; grid-template-columns: 3.4em 1fr; gap: 10px; border-radius: 8px; }
+.lyrics button span { font-family: var(--f-mono); font-size: .78rem; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.lyrics button.on { background: var(--accent-soft); font-weight: 600; }
+.lyr-empty { color: var(--muted); font-size: .9rem; margin: 0; max-width: 65ch; }
+.seg.small { display: inline-grid; grid-template-columns: repeat(3, auto); }
+.seg.small label { padding: 6px 10px; font-size: .82rem; }
+.cleanbox { display: inline-flex; align-items: center; gap: 8px; }
+.cleanbox .cap { font-size: .75rem; color: var(--muted); }
 .demo-badge { display: inline-block; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); margin-right: 6px; vertical-align: 2px; }
 footer { color: var(--muted); font-size: .82rem; max-width: 70ch; }
 footer p { margin: 0 0 6px; }
@@ -212,6 +224,15 @@ code { font-family: var(--f-mono); font-size: .85em; }
       <button class="toggle" id="tVoice" aria-pressed="true">Voz</button>
       <button class="toggle" id="tSong" aria-pressed="false">Canción</button>
       <span class="grow"></span>
+      <span class="cleanbox">
+        <span class="cap" id="cleanCap">Limpieza</span>
+        <fieldset class="seg small" id="cleanSeg" aria-labelledby="cleanCap">
+          <legend>Limpieza</legend>
+          <input type="radio" name="clean" id="c-suave" value="suave"><label for="c-suave">Suave</label>
+          <input type="radio" name="clean" id="c-normal" value="normal"><label for="c-normal">Normal</label>
+          <input type="radio" name="clean" id="c-fuerte" value="fuerte"><label for="c-fuerte">Fuerte</label>
+        </fieldset>
+      </span>
       <span class="group" title="Transportar en semitonos">
         <span class="cap">Tono</span>
         <button id="trDown" aria-label="Bajar un semitono">−</button>
@@ -227,10 +248,28 @@ code { font-family: var(--f-mono); font-size: .85em; }
 
     <div class="roll-wrap"><canvas id="roll" aria-label="Piano-roll con las notas de la voz"></canvas></div>
     <div class="chips" id="chips" aria-label="Notas en orden"></div>
+
+    <div class="lyr-head">
+      <h3>Letra</h3>
+      <label class="cap" for="lyrLang" style="font-size:.75rem;color:var(--muted)">Idioma</label>
+      <select id="lyrLang">
+        <option value="spanish">Español</option>
+        <option value="english">Inglés</option>
+        <option value="">Detectar</option>
+      </select>
+      <select id="lyrModel" aria-label="Precisión">
+        <option value="Xenova/whisper-base">Rápida (≈80 MB)</option>
+        <option value="Xenova/whisper-small">Precisa (≈250 MB)</option>
+      </select>
+      <button id="lyrBtn">Transcribir letra</button>
+    </div>
+    <p class="status" id="lyrStatus" role="status"></p>
+    <ul class="lyrics" id="lyrics"></ul>
   </section>
 
   <footer>
     <p>Arrastra el gráfico para moverte y toca un punto para saltar a ese momento. La línea fina es el tono exacto de la voz y los bloques son la nota más cercana. Notación: Do4 es el Do central y La4 = 440 Hz.</p>
+    <p>Si el gráfico sale con muchos fragmentos sueltos, sube la limpieza a Fuerte. Si faltan notas, bájala a Suave. La letra se transcribe con Whisper dentro del móvil: la primera vez descarga el modelo y después queda guardado. Con canto es aproximada.</p>
     <p>La separación aproximada funciona sin servidor pero deja restos de bajo y batería. Para canciones de verdad usa la de IA.</p>
   </footer>
 </div>
@@ -265,20 +304,22 @@ function makeFFT(n) {
   };
 }
 
-/* Detección de tono YIN (diferencia calculada con FFT). Devuelve midi por trama de 10 ms (NaN = sin voz). */
-async function trackPitch(x, sr, onProg) {
+/* Paso 1 · Candidatos de tono por trama (YIN, diferencia normalizada calculada con FFT).
+   En cada trama de 10 ms guarda hasta K periodos candidatos con su "aperiodicidad" (0 = periódico perfecto). */
+const K = 5;
+async function trackCandidates(x, sr, onProg) {
   const N = 1024, W = 512, F = 2048, H = Math.round(sr * 0.01), fft = makeFFT(F);
-  const tauMin = Math.floor(sr / 1100), tauMax = Math.min(W - 1, Math.ceil(sr / 65));
+  const tauMin = Math.floor(sr / 1050), tauMax = Math.min(W - 1, Math.ceil(sr / 70));
   const nF = Math.max(0, Math.floor((x.length - N) / H) + 1);
-  const midi = new Float32Array(nF).fill(NaN), rms = new Float32Array(nF);
+  const cm = new Float32Array(nF * K).fill(NaN), cd = new Float32Array(nF * K).fill(1), rms = new Float32Array(nF);
   for (let f = 0; f < nF; f++) { let s = 0; const o = f * H; for (let i = 0; i < N; i++) s += x[o + i] * x[o + i]; rms[f] = Math.sqrt(s / N); }
   const sorted = Array.from(rms).sort((a, b) => a - b);
-  const gate = Math.max(1e-4, (sorted[Math.floor(sorted.length * 0.95)] || 0) * 0.07);
+  const loud = sorted[Math.floor(sorted.length * 0.95)] || 0;
   const ar = new Float64Array(F), ai = new Float64Array(F), xr = new Float64Array(F), xi = new Float64Array(F);
-  const pre = new Float64Array(N + 1), d = new Float64Array(tauMax + 2);
+  const pre = new Float64Array(N + 1), d = new Float64Array(tauMax + 2), mins = [];
   for (let f = 0; f < nF; f++) {
     if (f % 400 === 0) { onProg && onProg(f / nF); await tick0(); }
-    if (rms[f] < gate) continue;
+    if (rms[f] < loud * 0.02) continue;
     const o = f * H;
     ar.fill(0); ai.fill(0); xr.fill(0); xi.fill(0);
     for (let i = 0; i < N; i++) { const v = x[o + i]; xr[i] = v; if (i < W) ar[i] = v; pre[i + 1] = pre[i] + v * v; }
@@ -290,30 +331,86 @@ async function trackPitch(x, sr, onProg) {
       const raw = E1 + (pre[tau + W] - pre[tau]) - 2 * ar[tau];
       run += raw; d[tau] = run > 0 ? raw * tau / run : 1;
     }
-    let tau = -1;
-    for (let t = tauMin; t < tauMax; t++) {
-      if (d[t] < 0.2) { while (t + 1 < tauMax && d[t + 1] < d[t]) t++; tau = t; break; }
+    mins.length = 0;
+    for (let t = tauMin; t < tauMax; t++) if (d[t] < 0.6 && d[t] < d[t - 1] && d[t] <= d[t + 1]) mins.push(t);
+    mins.sort((a, b) => d[a] - d[b]);
+    for (let k = 0; k < Math.min(K, mins.length); k++) {
+      const t = mins[k], a = d[t - 1], b = d[t], c = d[t + 1], den = a - 2 * b + c;
+      const bt = den !== 0 ? t + (a - c) / (2 * den) : t;
+      cm[f * K + k] = 69 + 12 * Math.log2(sr / bt / 440);
+      cd[f * K + k] = Math.max(0, b);
     }
-    if (tau < 0) {
-      let best = tauMin; for (let t = tauMin; t < tauMax; t++) if (d[t] < d[best]) best = t;
-      if (d[best] < 0.35) tau = best;
-    }
-    /* Evita errores de octava: si hay un buen mínimo en tau/2 o tau/3, el periodo real es ese. */
-    for (let k = 3; k >= 2 && tau > 0; k--) {
-      const c = Math.round(tau / k); if (c - 2 < tauMin) continue;
-      let bm = c - 2; for (let t = c - 2; t <= c + 2; t++) if (d[t] < d[bm]) bm = t;
-      if (bm > c - 2 && bm < c + 2 && d[bm] < 0.32) { tau = bm; break; }
-    }
-    if (tau < 1 || tau >= tauMax) continue;
-    const a = d[tau - 1], b = d[tau], c = d[tau + 1], den = a - 2 * b + c;
-    const bt = den !== 0 ? tau + (a - c) / (2 * den) : tau;
-    midi[f] = 69 + 12 * Math.log2(sr / bt / 440);
   }
   onProg && onProg(1);
-  return { midi, hop: H / sr };
+  return { cm, cd, rms, loud, nF, hop: H / sr };
 }
 
-/* Mediana de 5 sobre tramas con voz: quita saltos de octava aislados. */
+/* Niveles de limpieza: umbral de voz, duraciones mínimas y fusión de notas iguales. */
+const CLEAN = {
+  suave:  { vThr: 0.32, gate: 0.04, minRun: 0.04, minNote: 0.08, mergeGap: 0.08 },
+  normal: { vThr: 0.24, gate: 0.07, minRun: 0.07, minNote: 0.12, mergeGap: 0.12 },
+  fuerte: { vThr: 0.17, gate: 0.11, minRun: 0.12, minNote: 0.18, mergeGap: 0.18 }
+};
+
+/* Paso 2 · Recorrido de tono más probable (Viterbi, como pYIN).
+   Prefiere candidatos periódicos, castiga los saltos grandes (sobre todo de octava) y las notas muy lejos de la tesitura habitual. */
+function decodePitch(tr, p) {
+  const { cm, cd, rms, loud, nF } = tr, S = K + 1, gate = loud * p.gate;
+  const good = [];
+  for (let f = 0; f < nF; f++) if (cd[f * K] < 0.12 && rms[f] >= gate) good.push(cm[f * K]);
+  good.sort((a, b) => a - b);
+  const med = good.length ? good[good.length >> 1] : 60;
+  const emit = new Float32Array(S);
+  let prev = new Float64Array(S), cur = new Float64Array(S);
+  const back = new Uint8Array(nF * S);
+  const em = (f, k) => {
+    if (k === K) return p.vThr;
+    const m = cm[f * K + k];
+    if (isNaN(m)) return Infinity;
+    let c = cd[f * K + k] + 0.035 * Math.max(0, Math.abs(m - med) - 9);
+    if (rms[f] < gate) c += 0.6;
+    /* Ligera preferencia por el candidato más agudo entre los casi empatados (evita caer una octava). */
+    const top = cm[f * K]; if (!isNaN(top) && m < top - 6 && cd[f * K + k] - cd[f * K] < 0.08) c += 0.05;
+    return c;
+  };
+  const trans = (a, b) => { const dm = Math.abs(a - b); return 0.035 * Math.min(dm, 24) + (dm > 8.5 ? 0.3 : 0); };
+  for (let k = 0; k < S; k++) prev[k] = nF ? em(0, k) : 0;
+  for (let f = 1; f < nF; f++) {
+    for (let k = 0; k < S; k++) emit[k] = em(f, k);
+    for (let k = 0; k < S; k++) {
+      if (emit[k] === Infinity) { cur[k] = Infinity; continue; }
+      let best = Infinity, bi = K;
+      for (let j = 0; j < S; j++) {
+        if (prev[j] === Infinity) continue;
+        let c = prev[j];
+        if (j === K && k === K) {}
+        else if (j === K || k === K) c += 0.12;
+        else c += trans(cm[(f - 1) * K + j], cm[f * K + k]);
+        if (c < best) { best = c; bi = j; }
+      }
+      cur[k] = best + emit[k]; back[f * S + k] = bi;
+    }
+    const t = prev; prev = cur; cur = t;
+  }
+  const midi = new Float32Array(nF).fill(NaN);
+  if (!nF) return midi;
+  let k = 0; for (let j = 1; j < S; j++) if (prev[j] < prev[k]) k = j;
+  for (let f = nF - 1; f >= 0; f--) {
+    if (k !== K) midi[f] = cm[f * K + k];
+    k = back[f * S + k];
+  }
+  /* Quita tramos con voz demasiado cortos (consonantes, golpes, restos de batería). */
+  const minRun = Math.round(p.minRun / tr.hop);
+  for (let i = 0; i < nF;) {
+    if (isNaN(midi[i])) { i++; continue; }
+    let j = i; while (j < nF && !isNaN(midi[j])) j++;
+    if (j - i < minRun) midi.fill(NaN, i, j);
+    i = j;
+  }
+  return median5(midi);
+}
+
+/* Mediana de 5 sobre tramas con voz. */
 function median5(m) {
   const out = new Float32Array(m.length).fill(NaN), w = [];
   for (let i = 0; i < m.length; i++) {
@@ -325,35 +422,47 @@ function median5(m) {
   return out;
 }
 
-function segment(midi, hop) {
+/* Paso 3 · Notas: tramos estables a la misma altura (tolera vibrato y portamento). */
+function segment(midi, hop, p) {
   const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
-  const notes = []; let cur = null, gap = 0, off = 0;
+  let notes = []; let cur = null, gap = 0, off = 0;
   const close = () => {
-    if (cur) {
-      const dur = (cur.end - cur.start + 1) * hop;
-      if (dur >= 0.09) { const m = med(cur.vals); notes.push({ t: cur.start * hop, d: dur, m: Math.round(m) }); }
-    }
+    if (cur) { const dur = (cur.end - cur.start + 1) * hop; if (dur >= 0.04) notes.push({ t: cur.start * hop, d: dur, m: Math.round(med(cur.vals)) }); }
     cur = null;
   };
   for (let i = 0; i < midi.length; i++) {
     const v = midi[i];
     if (isNaN(v)) { if (cur && ++gap > 4) close(); continue; }
     if (!cur) { cur = { start: i, end: i, m: Math.round(v), vals: [v] }; gap = 0; off = 0; continue; }
-    if (Math.abs(v - cur.m) < 0.65) {
+    if (Math.abs(v - cur.m) < 0.7) {
       cur.end = i; cur.vals.push(v); gap = 0; off = 0;
       if (cur.vals.length === 6) cur.m = Math.round(med(cur.vals));
-    } else if (++off >= 4) {
+    } else if (++off >= 5) {
       const ns = i - off + 1; close();
       cur = { start: ns, end: i, m: Math.round(v), vals: [v] }; off = 0; gap = 0;
     }
   }
   close();
-  const out = [];
-  for (const n of notes) {
-    const p = out[out.length - 1];
-    if (p && p.m === n.m && n.t - (p.t + p.d) < 0.07) p.d = n.t + n.d - p.t; else out.push(n);
+  /* Las notas muy cortas pegadas a otra se absorben en la vecina más cercana en altura; las aisladas se descartan. */
+  for (let pass = 0; pass < 2; pass++) {
+    const out = [];
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      if (n.d >= p.minNote) { out.push(n); continue; }
+      const a = out[out.length - 1], b = notes[i + 1];
+      const ga = a ? n.t - (a.t + a.d) : 9, gb = b ? b.t - (n.t + n.d) : 9;
+      const okA = a && ga < 0.06 && Math.abs(a.m - n.m) <= 3, okB = b && gb < 0.06 && Math.abs(b.m - n.m) <= 3;
+      if (okA && (!okB || Math.abs(a.m - n.m) <= Math.abs(b.m - n.m))) a.d = n.t + n.d - a.t;
+      else if (okB) { b.d = b.t + b.d - n.t; b.t = n.t; }
+    }
+    notes = out;
   }
-  return out;
+  const res = [];
+  for (const n of notes) {
+    const q = res[res.length - 1];
+    if (q && q.m === n.m && n.t - (q.t + q.d) < p.mergeGap) q.d = n.t + n.d - q.t; else res.push({ ...n });
+  }
+  return res;
 }
 
 /* Tonalidad probable (Krumhansl–Schmuckler) ponderada por duración. */
@@ -416,7 +525,8 @@ const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = Math.fl
 const state = {
   notes: [], curve: null, origBuf: null, vocalBuf: null, duration: 0,
   transpose: 0, pxPerSec: 90, view: -0.3, playing: false, playhead: 0,
-  src: { lala: true, voice: true, song: false }, isDemo: true
+  src: { lala: true, voice: true, song: false }, isDemo: true,
+  raw: null, mono: null, clean: 'normal', lyrics: []
 };
 
 /* ---- Ejemplo inicial: Oda a la alegría (Beethoven, dominio público) ---- */
@@ -432,7 +542,10 @@ function loadDemo() {
       midi[i] = no.m + scoop + (tt > 0.25 ? 0.25 * Math.sin(2 * Math.PI * 5.5 * tt) : 0);
     }
   }
-  Object.assign(state, { notes, curve: { midi, hop }, origBuf: null, vocalBuf: null, duration: t + 0.5, isDemo: true, playhead: 0, view: -0.3 });
+  /* Letra original de Schiller (1785), dominio público. */
+  const lines = [[0, 7, 'Freude, schöner Götterfunken,'], [8, 14, 'Tochter aus Elysium,'], [15, 22, 'Wir betreten feuertrunken,'], [23, 29, 'Himmlische, dein Heiligtum!']];
+  const lyrics = lines.map(([a, b, text]) => ({ t0: notes[a].t, t1: notes[b].t + notes[b].d, text }));
+  Object.assign(state, { notes, curve: { midi, hop }, origBuf: null, vocalBuf: null, duration: t + 0.5, isDemo: true, playhead: 0, view: -0.3, raw: null, mono: null, lyrics });
   $('songTitle').textContent = 'Oda a la alegría';
   $('songMeta').innerHTML = '<span class="demo-badge">Ejemplo</span>Beethoven. Sube tu canción para ver la suya.';
   refreshInfo();
@@ -572,17 +685,19 @@ async function analyze() {
 
     run('pitch');
     const mono = await resample(vocal, 16000, 1);
-    const tr = await trackPitch(mono.getChannelData(0), 16000, p => status(`Detectando el tono… ${Math.round(p * 100)} %`));
+    const tr = await trackCandidates(mono.getChannelData(0), 16000, p => status(`Detectando el tono… ${Math.round(p * 100)} %`));
     step('pitch', 'done');
 
     run('notes');
-    const smooth = median5(tr.midi);
-    const notes = segment(smooth, tr.hop);
+    const P = CLEAN[state.clean];
+    const smooth = decodePitch(tr, P);
+    const notes = segment(smooth, tr.hop, P);
     step('notes', 'done');
     if (!notes.length) throw new Error('No se encontraron notas cantadas. Si la canción tiene mucha instrumentación, prueba la separación IA.');
 
     Object.assign(state, {
       notes, curve: { midi: smooth, hop: tr.hop }, origBuf: orig, vocalBuf: m === 'none' ? null : vocal,
+      raw: tr, mono: mono.getChannelData(0), lyrics: [],
       duration: Math.max(orig ? orig.duration : 0, vocal.duration), isDemo: false, playhead: 0, view: Math.max(-0.3, notes[0].t - 1)
     });
     if (m === 'none') state.vocalBuf = orig;
@@ -590,7 +705,7 @@ async function analyze() {
     const name = file ? file.name : decodeURIComponent(link.split('/').pop().split('?')[0] || 'Canción');
     $('songTitle').textContent = name.replace(/\.[a-z0-9]{2,4}$/i, '');
     $('songMeta').textContent = `${fmt(state.duration)} · separación ${m === 'ia' ? 'IA' : m === 'local' ? 'aproximada' : 'no aplicada'}`;
-    status(`Listo: ${notes.length} notas. Pulsa reproducir para oírlas.`);
+    status(`Listo: ${notes.length} notas. Pulsa reproducir para oírlas o transcribe la letra.`);
     refreshInfo();
   } catch (e) {
     if (curStep) step(curStep, 'error');
@@ -713,6 +828,109 @@ function zoom(k) {
 $('zIn').addEventListener('click', () => zoom(1.4));
 $('zOut').addEventListener('click', () => zoom(1 / 1.4));
 
+/* ---- Limpieza ---- */
+function applyClean(level) {
+  state.clean = CLEAN[level] ? level : 'normal';
+  document.querySelector(`input[name=clean][value=${state.clean}]`).checked = true;
+  store.set('tonalia.clean', state.clean);
+  if (!state.raw) return;
+  const P = CLEAN[state.clean];
+  const midi = decodePitch(state.raw, P);
+  state.curve = { midi, hop: state.raw.hop };
+  state.notes = segment(midi, state.raw.hop, P);
+  status(`Limpieza ${state.clean}: ${state.notes.length} notas.`);
+  refreshInfo(); restartIfPlaying();
+}
+document.querySelectorAll('input[name=clean]').forEach(r => r.addEventListener('change', () => applyClean(r.value)));
+document.querySelector(`input[name=clean][value=${store.get('tonalia.clean') || 'normal'}]`).checked = true;
+state.clean = store.get('tonalia.clean') || 'normal';
+
+/* ---- Letra (Whisper en el navegador, en un worker aparte) ---- */
+$('lyrLang').value = store.get('tonalia.lang') ?? 'spanish';
+$('lyrModel').value = store.get('tonalia.model') || 'Xenova/whisper-base';
+const HALLU = /subt[ií]tul|amara\.org|suscr[ií]b|gracias por ver|thanks for watching|\[m[uú]sica\]|\(m[uú]sica\)|♪+$/i;
+let asrWorker = null;
+function lyrStatus(msg, kind) { const s = $('lyrStatus'); s.textContent = msg || ''; s.className = 'status' + (kind ? ' ' + kind : ''); }
+function voicedShare(t0, t1) {
+  if (!state.curve) return 1;
+  const { midi, hop } = state.curve; let v = 0, n = 0;
+  for (let i = Math.floor(t0 / hop); i < Math.min(midi.length, t1 / hop); i++) { n++; if (!isNaN(midi[i])) v++; }
+  return n ? v / n : 0;
+}
+function cleanLyrics(chunks) {
+  const out = [];
+  chunks.forEach((c, i) => {
+    const text = (c.text || '').trim();
+    let [t0, t1] = c.timestamp || [0, null];
+    if (t0 == null) return;
+    if (t1 == null) t1 = chunks[i + 1] && chunks[i + 1].timestamp ? chunks[i + 1].timestamp[0] : Math.min(state.duration, t0 + 5);
+    if (!text || HALLU.test(text) || t1 <= t0) return;
+    if (voicedShare(t0, t1) < 0.12) return;
+    const prev = out[out.length - 1];
+    if (prev && prev.text === text && t0 - prev.t1 < 0.5 && t1 - t0 < 1.5) { prev.t1 = t1; return; }
+    out.push({ t0, t1, text });
+  });
+  return out;
+}
+function transcribe() {
+  if (!state.mono) { lyrStatus('Primero analiza una canción. El ejemplo ya trae su letra.', 'error'); return; }
+  const model = $('lyrModel').value, language = $('lyrLang').value;
+  store.set('tonalia.model', model); store.set('tonalia.lang', language);
+  try { asrWorker = asrWorker || new Worker('letra-worker.js', { type: 'module' }); }
+  catch (e) { lyrStatus('Este navegador no puede ejecutar la transcripción. Ábrela desde la app publicada en GitHub Pages.', 'error'); return; }
+  $('lyrBtn').disabled = true;
+  const files = {};
+  lyrStatus('Preparando el modelo…');
+  asrWorker.onerror = () => { lyrStatus('No se pudo cargar el transcriptor. Comprueba la conexión y vuelve a intentarlo.', 'error'); $('lyrBtn').disabled = false; asrWorker = null; };
+  asrWorker.onmessage = e => {
+    const m = e.data;
+    if (m.type === 'load' && m.p && m.p.status === 'progress' && m.p.total) {
+      files[m.p.file] = [m.p.loaded, m.p.total];
+      let a = 0, b = 0; for (const [l, t] of Object.values(files)) { a += l; b += t; }
+      lyrStatus(`Descargando el modelo (solo la primera vez)… ${Math.round(a / 1048576)} de ${Math.round(b / 1048576)} MB`);
+    } else if (m.type === 'run') {
+      lyrStatus('Transcribiendo la letra… en un móvil puede tardar unos minutos.');
+    } else if (m.type === 'done') {
+      state.lyrics = cleanLyrics(m.chunks);
+      lyrStatus(state.lyrics.length ? `Letra lista: ${state.lyrics.length} frases. Toca una para saltar a ese momento.` : 'No se reconoció letra. Prueba con el modelo Preciso o eligiendo el idioma.', state.lyrics.length ? '' : 'error');
+      $('lyrBtn').disabled = false; renderLyrics(); draw();
+    } else if (m.type === 'error') {
+      lyrStatus('La transcripción falló: ' + m.message, 'error'); $('lyrBtn').disabled = false;
+    }
+  };
+  const audio = state.mono.slice();
+  asrWorker.postMessage({ audio, model, language }, [audio.buffer]);
+}
+$('lyrBtn').addEventListener('click', transcribe);
+
+function renderLyrics() {
+  const ul = $('lyrics'); ul.textContent = ''; lastLyr = -1;
+  if (!state.lyrics.length) {
+    const p = document.createElement('li');
+    p.innerHTML = '<p class="lyr-empty">Pulsa <strong>Transcribir letra</strong> para sacar la letra con sus tiempos. Aparecerá aquí y bajo las notas.</p>';
+    ul.appendChild(p); return;
+  }
+  state.lyrics.forEach(l => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.innerHTML = `<span>${fmt(l.t0)}</span>`; b.appendChild(document.createTextNode(l.text));
+    b.addEventListener('click', () => seek(l.t0));
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+let lastLyr = -1;
+function syncLyric(t) {
+  const i = state.lyrics.findIndex(l => t >= l.t0 && t < l.t1);
+  if (i === lastLyr) return;
+  const ul = $('lyrics');
+  if (lastLyr >= 0 && ul.children[lastLyr]) ul.children[lastLyr].firstChild.classList.remove('on');
+  lastLyr = i;
+  if (i >= 0 && ul.children[i] && ul.children[i].firstChild) {
+    const el = ul.children[i]; el.firstChild.classList.add('on');
+    const top = el.offsetTop - ul.offsetTop;
+    if (top < ul.scrollTop || top > ul.scrollTop + ul.clientHeight - 40) ul.scrollTop = top - ul.clientHeight / 3;
+  }
+}
+
 /* ---- Datos de cabecera y chips ---- */
 function refreshInfo() {
   const ms = state.notes.map(n => n.m + state.transpose);
@@ -733,6 +951,7 @@ function refreshInfo() {
     frag.appendChild(b);
   });
   chips.appendChild(frag);
+  renderLyrics();
   draw();
 }
 let lastChip = -1;
@@ -768,7 +987,8 @@ function draw() {
   const ms = state.notes.map(n => n.m + T);
   let lo = ms.length ? Math.min(...ms) - 2 : 57, hi = ms.length ? Math.max(...ms) + 2 : 72;
   if (hi - lo < 14) { const c = (hi + lo) / 2; lo = Math.floor(c - 7); hi = Math.ceil(c + 7); }
-  const G = 46, top = 22, rows = hi - lo + 1, rh = (h - top) / rows;
+  const band = state.lyrics.length ? 30 : 0;
+  const G = 46, top = 22, rows = hi - lo + 1, rh = (h - top - band) / rows;
   const X = s => G + (s - state.view) * state.pxPerSec, Y = m => top + (hi - m) * rh;
   const t0 = state.view, t1 = state.view + (w - G) / state.pxPerSec;
 
@@ -818,6 +1038,23 @@ function draw() {
     g.globalAlpha = 1;
     if (wd > 28 && rh >= 11) { g.fillStyle = col('--note-text'); g.fillText(NAMES[pcOf(m)], x + 5, y + rh / 2 + 0.5); }
   }
+  /* Letra bajo las notas */
+  if (band) {
+    const by = h - band;
+    g.fillStyle = col('--surface'); g.fillRect(G, by, w - G, band);
+    g.fillStyle = col('--line'); g.fillRect(G, by, w - G, 1);
+    g.font = `500 13px ${col('--f-body')}`;
+    for (const l of state.lyrics) {
+      if (l.t1 < t0 || l.t0 > t1) continue;
+      const x0 = Math.max(G, X(l.t0)), x1 = X(l.t1), on = t >= l.t0 && t < l.t1;
+      if (x1 - x0 < 8) continue;
+      g.save(); g.beginPath(); g.rect(x0, by, x1 - x0 - 4, band); g.clip();
+      if (on) { g.fillStyle = col('--accent-soft'); g.fillRect(x0, by + 1, x1 - x0, band - 1); }
+      g.fillStyle = on ? col('--ink') : col('--muted');
+      g.fillText(l.text, x0 + 4, by + band / 2 + 1);
+      g.restore();
+    }
+  }
   /* Etiquetas de notas */
   g.fillStyle = col('--surface'); g.fillRect(0, 0, G, h);
   g.fillStyle = col('--line'); g.fillRect(G - 1, 0, 1, h);
@@ -835,6 +1072,7 @@ function draw() {
   if (px >= G) { g.fillStyle = col('--accent'); g.fillRect(px - 1, 0, 2, h); }
   $('time').textContent = `${fmt(t)} / ${fmt(state.duration)}`;
   syncChip(t);
+  syncLyric(t);
 }
 
 /* Arrastrar para moverse, tocar para saltar */
