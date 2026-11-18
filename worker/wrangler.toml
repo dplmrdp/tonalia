@@ -1,0 +1,8 @@
+name = "tonalia-separador"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+REPLICATE_MODEL = "ryan5453/demucs"
+AUDIO_INPUT_NAME = "audio"
+# ALLOWED_ORIGIN = "https://dplmrdp.github.io"
