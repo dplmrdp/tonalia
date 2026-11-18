@@ -29,8 +29,9 @@
   --roll: #FAFBFC;
   --roll-alt: #EDF0F4;
   --curve: rgba(21, 25, 34, .55);
-  --note-s: 62%;
-  --note-l: 50%;
+  --note: #6E9C92;
+  --note-past: #C6CED7;
+  --note-on: #0B7A63;
   --note-text: #FFFFFF;
   --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -41,14 +42,14 @@
     --bg: #0E1115; --surface: #161A20; --ink: #E7EBF0; --muted: #98A1AF; --line: #29303A;
     --accent: #3FCBA6; --accent-ink: #062A21; --accent-soft: #123A31; --danger: #F97066;
     --roll: #11151A; --roll-alt: #181D24; --curve: rgba(231, 235, 240, .6);
-    --note-s: 58%; --note-l: 60%; --note-text: #0E1115; color-scheme: dark;
+    --note: #4C8E7F; --note-past: #343C46; --note-on: #3FCBA6; --note-text: #0E1115; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0E1115; --surface: #161A20; --ink: #E7EBF0; --muted: #98A1AF; --line: #29303A;
   --accent: #3FCBA6; --accent-ink: #062A21; --accent-soft: #123A31; --danger: #F97066;
   --roll: #11151A; --roll-alt: #181D24; --curve: rgba(231, 235, 240, .6);
-  --note-s: 58%; --note-l: 60%; --note-text: #0E1115; color-scheme: dark;
+  --note: #4C8E7F; --note-past: #343C46; --note-on: #3FCBA6; --note-text: #0E1115; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -133,12 +134,25 @@ button:disabled { opacity: .5; cursor: default; }
 .group .cap { font-size: .75rem; color: var(--muted); padding-left: 10px; }
 
 .roll-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
-canvas { display: block; width: 100%; height: 340px; touch-action: pan-y; cursor: grab; }
-@media (min-width: 700px) { canvas { height: 420px; } }
+canvas { display: block; width: 100%; height: 380px; touch-action: pan-y; cursor: grab; }
+@media (min-width: 700px) { canvas { height: 440px; } }
+.now { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; background: var(--bg); border-radius: 12px; padding: 10px 14px; min-height: 64px; }
+.now-note { font-family: var(--f-display); font-weight: 700; font-size: 2rem; line-height: 1; color: var(--note-on); min-width: 3.2ch; font-variant-numeric: tabular-nums; }
+.now-syl { font-family: var(--f-display); font-weight: 600; font-size: 1.35rem; min-width: 0; overflow-wrap: anywhere; }
+.now-next { color: var(--muted); font-size: .85rem; text-align: right; }
+.now-next b { display: block; font-family: var(--f-mono); color: var(--ink); font-size: 1rem; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > input { flex: 1 1 180px; }
+textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; resize: vertical; min-height: 140px; }
+.results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.results button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; }
+.results small { color: var(--muted); }
+.pill { display: inline-block; font-size: .7rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); margin-left: 6px; }
+.tap { width: 100%; }
+details.settings { border-top: none; padding-top: 0; }
+details.settings > .toolbar { margin-top: 10px; }
+details.settings summary { color: var(--muted); font-size: .88rem; }
 
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
-.chip { flex: none; font-family: var(--f-mono); font-size: .8rem; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); }
-.chip.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .lyr-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; }
 .lyr-head h3 { font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; margin: 0 auto 0 0; }
 select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
@@ -223,7 +237,11 @@ code { font-family: var(--f-mono); font-size: .85em; }
       <button class="toggle" id="tLala" aria-pressed="true">La la la</button>
       <button class="toggle" id="tVoice" aria-pressed="true">Voz</button>
       <button class="toggle" id="tSong" aria-pressed="false">Canción</button>
-      <span class="grow"></span>
+      <button class="toggle" id="tCurve" aria-pressed="false" title="Mostrar el tono exacto de la voz">Curva</button>
+    </div>
+    <details class="settings">
+      <summary>Ajustes: limpieza, tipo de voz, tono y zoom</summary>
+    <div class="toolbar">
       <span class="cleanbox">
         <span class="cap" id="cleanCap">Limpieza</span>
         <fieldset class="seg small" id="cleanSeg" aria-labelledby="cleanCap">
@@ -233,6 +251,11 @@ code { font-family: var(--f-mono); font-size: .85em; }
           <input type="radio" name="clean" id="c-fuerte" value="fuerte"><label for="c-fuerte">Fuerte</label>
         </fieldset>
       </span>
+      <select id="voiceSel" aria-label="Tipo de voz">
+        <option value="auto">Voz: automática</option>
+        <option value="grave">Voz grave</option>
+        <option value="aguda">Voz aguda</option>
+      </select>
       <span class="group" title="Transportar en semitonos">
         <span class="cap">Tono</span>
         <button id="trDown" aria-label="Bajar un semitono">−</button>
@@ -245,31 +268,67 @@ code { font-family: var(--f-mono); font-size: .85em; }
         <button id="zIn" aria-label="Acercar">+</button>
       </span>
     </div>
+    </details>
 
+    <div class="now" aria-live="off">
+      <span class="now-note" id="nowNote">—</span>
+      <span class="now-syl" id="nowSyl"></span>
+      <span class="now-next">Siguiente<b id="nowNext">—</b></span>
+    </div>
     <div class="roll-wrap"><canvas id="roll" aria-label="Piano-roll con las notas de la voz"></canvas></div>
-    <div class="chips" id="chips" aria-label="Notas en orden"></div>
 
-    <div class="lyr-head">
-      <h3>Letra</h3>
-      <label class="cap" for="lyrLang" style="font-size:.75rem;color:var(--muted)">Idioma</label>
-      <select id="lyrLang">
-        <option value="spanish">Español</option>
-        <option value="english">Inglés</option>
-        <option value="">Detectar</option>
-      </select>
-      <select id="lyrModel" aria-label="Precisión">
-        <option value="Xenova/whisper-base">Rápida (≈80 MB)</option>
-        <option value="Xenova/whisper-small">Precisa (≈250 MB)</option>
-      </select>
-      <button id="lyrBtn">Transcribir letra</button>
+    <div class="lyr-head"><h3>Letra</h3><span class="cap" id="lyrInfo" style="font-size:.8rem;color:var(--muted)"></span></div>
+    <fieldset class="seg" id="lyrSrc">
+      <legend>Origen de la letra</legend>
+      <input type="radio" name="lsrc" id="ls-search" value="search" checked><label for="ls-search">Buscar</label>
+      <input type="radio" name="lsrc" id="ls-paste" value="paste"><label for="ls-paste">Pegar</label>
+      <input type="radio" name="lsrc" id="ls-asr" value="asr"><label for="ls-asr">Transcribir</label>
+    </fieldset>
+    <div id="pSearch" class="row" style="flex-direction:column;align-items:stretch">
+      <div class="row">
+        <input type="text" id="lyrQ" placeholder="Título y artista" autocomplete="off">
+        <button id="lyrSearch">Buscar letra</button>
+      </div>
+      <p class="hint">Busca en LRCLIB, una base de letras libre. Muchas canciones vienen ya sincronizadas.</p>
+      <ul class="results" id="lyrResults"></ul>
+    </div>
+    <div id="pPaste" hidden style="display:flex;flex-direction:column;gap:8px">
+      <textarea id="lyrText" placeholder="Pega aquí la letra, una frase por línea"></textarea>
+      <button id="lyrPlace">Colocar sobre las notas</button>
+      <p class="hint">La app reparte las frases por las pausas de la voz y cuadra las sílabas con las notas. Si no queda bien, usa Sincronizar a mano.</p>
+    </div>
+    <div id="pAsr" hidden style="display:flex;flex-direction:column;gap:8px">
+      <div class="row">
+        <select id="lyrLang" aria-label="Idioma">
+          <option value="spanish">Español</option>
+          <option value="english">Inglés</option>
+          <option value="">Detectar idioma</option>
+        </select>
+        <select id="lyrModel" aria-label="Precisión">
+          <option value="Xenova/whisper-base">Rápida (≈80 MB)</option>
+          <option value="Xenova/whisper-small">Precisa (≈250 MB)</option>
+        </select>
+        <button id="lyrBtn">Transcribir</button>
+      </div>
+      <p class="hint">Experimental. Whisper está pensado para habla y con canto se equivoca a menudo. Úsalo solo si la canción no aparece al buscar.</p>
     </div>
     <p class="status" id="lyrStatus" role="status"></p>
+    <div class="row" id="lyrTools" hidden>
+      <span class="group" title="Mover toda la letra en el tiempo">
+        <span class="cap">Desfase</span>
+        <button id="offDown" aria-label="Adelantar la letra">−</button>
+        <output id="offVal">0,0 s</output>
+        <button id="offUp" aria-label="Retrasar la letra">+</button>
+      </span>
+      <button id="tapStart">Sincronizar a mano</button>
+    </div>
+    <button class="primary tap" id="tapBtn" hidden>Marcar frase</button>
     <ul class="lyrics" id="lyrics"></ul>
   </section>
 
   <footer>
-    <p>Arrastra el gráfico para moverte y toca un punto para saltar a ese momento. La línea fina es el tono exacto de la voz y los bloques son la nota más cercana. Notación: Do4 es el Do central y La4 = 440 Hz.</p>
-    <p>Si el gráfico sale con muchos fragmentos sueltos, sube la limpieza a Fuerte. Si faltan notas, bájala a Suave. La letra se transcribe con Whisper dentro del móvil: la primera vez descarga el modelo y después queda guardado. Con canto es aproximada.</p>
+    <p>Arrastra el gráfico para moverte y toca un punto para saltar a ese momento. Los bloques son las notas que hay que cantar; el activo se ilumina y los ya cantados se apagan. Notación: Do4 es el Do central y La4 = 440 Hz.</p>
+    <p>Si salen fragmentos sueltos, sube la limpieza a Fuerte o indica si la voz es grave o aguda. Si faltan notas, bájala a Suave.</p>
     <p>La separación aproximada funciona sin servidor pero deja restos de bajo y batería. Para canciones de verdad usa la de IA.</p>
   </footer>
 </div>
@@ -347,10 +406,12 @@ async function trackCandidates(x, sr, onProg) {
 
 /* Niveles de limpieza: umbral de voz, duraciones mínimas y fusión de notas iguales. */
 const CLEAN = {
-  suave:  { vThr: 0.32, gate: 0.04, minRun: 0.04, minNote: 0.08, mergeGap: 0.08 },
-  normal: { vThr: 0.24, gate: 0.07, minRun: 0.07, minNote: 0.12, mergeGap: 0.12 },
-  fuerte: { vThr: 0.17, gate: 0.11, minRun: 0.12, minNote: 0.18, mergeGap: 0.18 }
+  suave:  { vThr: 0.32, gate: 0.04, minRun: 0.04, minNote: 0.08, mergeGap: 0.08, maxAp: 0.30, aba: 0.12, iso: 1.5 },
+  normal: { vThr: 0.24, gate: 0.07, minRun: 0.07, minNote: 0.12, mergeGap: 0.12, maxAp: 0.22, aba: 0.22, iso: 0.9 },
+  fuerte: { vThr: 0.17, gate: 0.11, minRun: 0.12, minNote: 0.18, mergeGap: 0.18, maxAp: 0.16, aba: 0.32, iso: 0.6 }
 };
+/* Tesitura por tipo de voz, en notas MIDI (Re2–La4 y Fa3–Re6). */
+const VOICES = { auto: null, grave: [38, 69], aguda: [53, 86] };
 
 /* Paso 2 · Recorrido de tono más probable (Viterbi, como pYIN).
    Prefiere candidatos periódicos, castiga los saltos grandes (sobre todo de octava) y las notas muy lejos de la tesitura habitual. */
@@ -366,7 +427,7 @@ function decodePitch(tr, p) {
   const em = (f, k) => {
     if (k === K) return p.vThr;
     const m = cm[f * K + k];
-    if (isNaN(m)) return Infinity;
+    if (isNaN(m) || (p.range && (m < p.range[0] - 0.5 || m > p.range[1] + 0.5))) return Infinity;
     let c = cd[f * K + k] + 0.035 * Math.max(0, Math.abs(m - med) - 9);
     if (rms[f] < gate) c += 0.6;
     /* Ligera preferencia por el candidato más agudo entre los casi empatados (evita caer una octava). */
@@ -395,8 +456,9 @@ function decodePitch(tr, p) {
   const midi = new Float32Array(nF).fill(NaN);
   if (!nF) return midi;
   let k = 0; for (let j = 1; j < S; j++) if (prev[j] < prev[k]) k = j;
+  const ap = new Float32Array(nF).fill(1);
   for (let f = nF - 1; f >= 0; f--) {
-    if (k !== K) midi[f] = cm[f * K + k];
+    if (k !== K) { midi[f] = cm[f * K + k]; ap[f] = cd[f * K + k]; }
     k = back[f * S + k];
   }
   /* Quita tramos con voz demasiado cortos (consonantes, golpes, restos de batería). */
@@ -407,7 +469,8 @@ function decodePitch(tr, p) {
     if (j - i < minRun) midi.fill(NaN, i, j);
     i = j;
   }
-  return median5(midi);
+  const out = median5(midi); out.ap = ap;
+  return out;
 }
 
 /* Mediana de 5 sobre tramas con voz. */
@@ -425,9 +488,14 @@ function median5(m) {
 /* Paso 3 · Notas: tramos estables a la misma altura (tolera vibrato y portamento). */
 function segment(midi, hop, p) {
   const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+  const ap = midi.ap;
   let notes = []; let cur = null, gap = 0, off = 0;
   const close = () => {
-    if (cur) { const dur = (cur.end - cur.start + 1) * hop; if (dur >= 0.04) notes.push({ t: cur.start * hop, d: dur, m: Math.round(med(cur.vals)) }); }
+    if (cur) {
+      const dur = (cur.end - cur.start + 1) * hop;
+      let a = 0, c = 0; if (ap) for (let i = cur.start; i <= cur.end; i++) if (!isNaN(midi[i])) { a += ap[i]; c++; }
+      if (dur >= 0.04) notes.push({ t: cur.start * hop, d: dur, m: Math.round(med(cur.vals)), ap: c ? a / c : 0 });
+    }
     cur = null;
   };
   for (let i = 0; i < midi.length; i++) {
@@ -457,10 +525,28 @@ function segment(midi, hop, p) {
     }
     notes = out;
   }
+  /* Notas poco fiables (sonido poco periódico: ruido, restos de instrumentos). */
+  notes = notes.filter(n => n.ap <= p.maxAp);
+  /* A-B-A: una nota breve a un semitono entre dos iguales es vibrato o portamento, no una nota. */
+  for (let i = 1; i < notes.length - 1; i++) {
+    const a = notes[i - 1], b = notes[i], c = notes[i + 1];
+    if (a.m === c.m && Math.abs(b.m - a.m) <= 2 && b.d < p.aba && b.t - (a.t + a.d) < 0.08 && c.t - (b.t + b.d) < 0.08) {
+      a.d = c.t + c.d - a.t; notes.splice(i, 2); i--;
+    }
+  }
+  /* Fuera de la tesitura habitual de la canción (más de una octava del centro). */
+  if (notes.length > 8) { const mm = med(notes.map(n => n.m)); notes = notes.filter(n => Math.abs(n.m - mm) <= 12); }
+  /* Notas cortas aisladas, lejos de cualquier frase. */
+  notes = notes.filter((n, i) => {
+    if (n.d >= 0.25) return true;
+    const a = notes[i - 1], b = notes[i + 1];
+    const ga = a ? n.t - (a.t + a.d) : 99, gb = b ? b.t - (n.t + n.d) : 99;
+    return Math.min(ga, gb) < p.iso;
+  });
   const res = [];
   for (const n of notes) {
     const q = res[res.length - 1];
-    if (q && q.m === n.m && n.t - (q.t + q.d) < p.mergeGap) q.d = n.t + n.d - q.t; else res.push({ ...n });
+    if (q && q.m === n.m && n.t - (q.t + q.d) < p.mergeGap) q.d = n.t + n.d - q.t; else res.push({ t: n.t, d: n.d, m: n.m, ap: n.ap });
   }
   return res;
 }
@@ -526,7 +612,7 @@ const state = {
   notes: [], curve: null, origBuf: null, vocalBuf: null, duration: 0,
   transpose: 0, pxPerSec: 90, view: -0.3, playing: false, playhead: 0,
   src: { lala: true, voice: true, song: false }, isDemo: true,
-  raw: null, mono: null, clean: 'normal', lyrics: []
+  raw: null, mono: null, clean: 'normal', voice: 'auto', lyrics: [], showCurve: false, lyrOffset: 0, tap: -1
 };
 
 /* ---- Ejemplo inicial: Oda a la alegría (Beethoven, dominio público) ---- */
@@ -689,7 +775,7 @@ async function analyze() {
     step('pitch', 'done');
 
     run('notes');
-    const P = CLEAN[state.clean];
+    const P = params();
     const smooth = decodePitch(tr, P);
     const notes = segment(smooth, tr.hop, P);
     step('notes', 'done');
@@ -704,8 +790,10 @@ async function analyze() {
     state.src.song = false;
     const name = file ? file.name : decodeURIComponent(link.split('/').pop().split('?')[0] || 'Canción');
     $('songTitle').textContent = name.replace(/\.[a-z0-9]{2,4}$/i, '');
+    $('lyrQ').value = $('songTitle').textContent.replace(/[_]+/g, ' ').replace(/\((?:vocals?|voz|instrumental)[^)]*\)|\b(vocals?|voz)\b/gi, '').trim();
+    $('lyrInfo').textContent = ''; $('lyrResults').textContent = ''; lyrStatus(''); state.tap = -1; $('tapBtn').hidden = true;
     $('songMeta').textContent = `${fmt(state.duration)} · separación ${m === 'ia' ? 'IA' : m === 'local' ? 'aproximada' : 'no aplicada'}`;
-    status(`Listo: ${notes.length} notas. Pulsa reproducir para oírlas o transcribe la letra.`);
+    status(`Listo: ${notes.length} notas. Pulsa reproducir para oírlas o busca la letra.`);
     refreshInfo();
   } catch (e) {
     if (curStep) step(curStep, 'error');
@@ -797,7 +885,7 @@ function frame() {
   const t = now();
   if (t >= state.duration) { state.playhead = state.duration; pause(); return; }
   const w = $('roll').clientWidth - 46, span = w / state.pxPerSec;
-  if (t > state.view + span * 0.8 || t < state.view) state.view = t - span * 0.25;
+  if (!dragging) state.view = t - span * 0.25;
   draw();
   requestAnimationFrame(frame);
 }
@@ -811,6 +899,8 @@ function bindToggle(id, key) {
   });
 }
 bindToggle('tLala', 'lala'); bindToggle('tVoice', 'voice'); bindToggle('tSong', 'song');
+$('tCurve').addEventListener('click', () => { state.showCurve = !state.showCurve; $('tCurve').setAttribute('aria-pressed', state.showCurve); store.set('tonalia.curve', state.showCurve ? '1' : ''); draw(); });
+state.showCurve = store.get('tonalia.curve') === '1'; $('tCurve').setAttribute('aria-pressed', state.showCurve);
 
 function setTranspose(v) {
   state.transpose = Math.max(-12, Math.min(12, v));
@@ -828,88 +918,294 @@ function zoom(k) {
 $('zIn').addEventListener('click', () => zoom(1.4));
 $('zOut').addEventListener('click', () => zoom(1 / 1.4));
 
-/* ---- Limpieza ---- */
-function applyClean(level) {
-  state.clean = CLEAN[level] ? level : 'normal';
-  document.querySelector(`input[name=clean][value=${state.clean}]`).checked = true;
-  store.set('tonalia.clean', state.clean);
+/* ---- Limpieza y tipo de voz ---- */
+let dragging = false;
+function params() { return { ...CLEAN[state.clean], range: VOICES[state.voice] }; }
+function reprocess(msg) {
+  store.set('tonalia.clean', state.clean); store.set('tonalia.voice', state.voice);
   if (!state.raw) return;
-  const P = CLEAN[state.clean];
+  const P = params();
   const midi = decodePitch(state.raw, P);
   state.curve = { midi, hop: state.raw.hop };
   state.notes = segment(midi, state.raw.hop, P);
-  status(`Limpieza ${state.clean}: ${state.notes.length} notas.`);
+  status(`${msg}: ${state.notes.length} notas.`);
   refreshInfo(); restartIfPlaying();
 }
-document.querySelectorAll('input[name=clean]').forEach(r => r.addEventListener('change', () => applyClean(r.value)));
-document.querySelector(`input[name=clean][value=${store.get('tonalia.clean') || 'normal'}]`).checked = true;
-state.clean = store.get('tonalia.clean') || 'normal';
+state.clean = CLEAN[store.get('tonalia.clean')] ? store.get('tonalia.clean') : 'normal';
+state.voice = VOICES[store.get('tonalia.voice')] !== undefined ? store.get('tonalia.voice') : 'auto';
+document.querySelector(`input[name=clean][value=${state.clean}]`).checked = true;
+$('voiceSel').value = state.voice;
+document.querySelectorAll('input[name=clean]').forEach(r => r.addEventListener('change', () => { state.clean = r.value; reprocess('Limpieza ' + r.value); }));
+$('voiceSel').addEventListener('change', () => { state.voice = $('voiceSel').value; reprocess($('voiceSel').selectedOptions[0].textContent); });
 
-/* ---- Letra (Whisper en el navegador, en un worker aparte) ---- */
+/* ---- Sílabas (reglas del español; sirven razonablemente para otros idiomas) ---- */
+const VOWELS = 'aeiouáéíóúàèìòùüâêîôûäëïöy';
+const STRONG = 'aeoáéóàèòâêôäëöíúìù';
+const INSEP = new Set(['pr', 'br', 'tr', 'dr', 'cr', 'kr', 'gr', 'fr', 'pl', 'bl', 'cl', 'kl', 'gl', 'fl', 'ch', 'll', 'rr']);
+function syllabify(word) {
+  const w = word.toLowerCase(), n = w.length;
+  const isV = i => {
+    const c = w[i]; if (!VOWELS.includes(c)) return false;
+    if (c === 'y') return !(i + 1 < n && VOWELS.includes(w[i + 1])) && i > 0;
+    if (c === 'u' && i > 0 && (w[i - 1] === 'q' || w[i - 1] === 'g') && 'eiéí'.includes(w[i + 1] || '')) return false;
+    return true;
+  };
+  const nuc = [];
+  for (let i = 0; i < n; i++) {
+    if (!isV(i)) continue;
+    const last = nuc[nuc.length - 1];
+    if (last && last[1] === i - 1 && !(STRONG.includes(w[i]) && STRONG.includes(w[i - 1])) && w[i - 1] !== w[i]) last[1] = i;
+    else nuc.push([i, i]);
+  }
+  if (nuc.length < 2) return [word];
+  const cuts = [];
+  for (let k = 0; k < nuc.length - 1; k++) {
+    const a = nuc[k][1] + 1, b = nuc[k + 1][0], cl = w.slice(a, b).replace(/[^a-zñç]/g, '');
+    let c;
+    if (cl.length <= 1) c = b - cl.length;
+    else if (cl.length === 2) c = INSEP.has(cl) ? b - 2 : b - 1;
+    else c = INSEP.has(cl.slice(-2)) ? b - 2 : b - 1;
+    cuts.push(Math.max(a, c));
+  }
+  const out = []; let prev = 0;
+  for (const c of cuts) { out.push(word.slice(prev, c)); prev = c; }
+  out.push(word.slice(prev));
+  return out.filter(x => x);
+}
+function lineSyllables(text) {
+  const out = [];
+  for (const wd of text.split(/\s+/).filter(Boolean)) {
+    if (!/[\p{L}]/u.test(wd)) continue;
+    const s = syllabify(wd);
+    s.forEach((x, i) => out.push(i < s.length - 1 ? x + '-' : x));
+  }
+  return out;
+}
+
+/* Reparte las sílabas de cada frase entre las notas que caen dentro de ella. */
+function assignSyllables() {
+  for (const n of state.notes) n.syl = '';
+  for (const l of state.lyrics) {
+    const ns = state.notes.filter(n => n.t >= l.t0 - 0.12 && n.t < l.t1 - 0.05);
+    const sy = l.syl || (l.syl = lineSyllables(l.text));
+    if (!ns.length || !sy.length) continue;
+    if (sy.length <= ns.length) sy.forEach((x, i) => { ns[Math.floor(i * ns.length / sy.length)].syl = x; });
+    else ns.forEach((n, j) => {
+      const a = Math.floor(j * sy.length / ns.length), b = Math.floor((j + 1) * sy.length / ns.length);
+      n.syl = sy.slice(a, b).map((x, i, arr) => i < arr.length - 1 ? (x.endsWith('-') ? x.slice(0, -1) : x + ' ') : x).join('');
+    });
+  }
+}
+
+/* ---- Letra ---- */
+function lyrStatus(msg, kind) { const s = $('lyrStatus'); s.textContent = msg || ''; s.className = 'status' + (kind ? ' ' + kind : ''); }
+function setLyrics(lines, source) {
+  state.lyrics = lines.map(l => ({ t0: l.t0, t1: l.t1, text: l.text }));
+  state.lyrOffset = 0; $('offVal').textContent = '0,0 s';
+  $('lyrInfo').textContent = state.lyrics.length ? source : '';
+  $('lyrTools').hidden = !state.lyrics.length;
+  refreshInfo();
+}
+document.querySelectorAll('input[name=lsrc]').forEach(r => r.addEventListener('change', () => {
+  $('pSearch').hidden = r.value !== 'search'; $('pPaste').hidden = r.value !== 'paste'; $('pAsr').hidden = r.value !== 'asr';
+  lyrStatus('');
+}));
+
+/* Formato LRC: [mm:ss.xx] texto */
+function parseLRC(txt) {
+  const rows = [];
+  for (const line of txt.split(/\r?\n/)) {
+    const tags = [...line.matchAll(/\[(\d+):(\d+(?:[.,]\d+)?)\]/g)];
+    if (!tags.length) continue;
+    const text = line.replace(/\[[^\]]*\]/g, '').trim();
+    for (const m of tags) rows.push({ t0: +m[1] * 60 + parseFloat(m[2].replace(',', '.')), text });
+  }
+  rows.sort((a, b) => a.t0 - b.t0);
+  const out = [];
+  rows.forEach((r, i) => {
+    if (!r.text) return;
+    const next = rows[i + 1] ? rows[i + 1].t0 : r.t0 + 6;
+    out.push({ t0: r.t0, t1: Math.min(next, r.t0 + 12), text: r.text });
+  });
+  return out;
+}
+
+/* Coloca una letra sin tiempos: reparte las frases por las pausas de la voz y cuadra sílabas con notas (programación dinámica). */
+function alignPlain(lines) {
+  const N = state.notes, L = lines.length;
+  if (N.length < L) return null;
+  const sy = lines.map(l => Math.max(1, lineSyllables(l).length));
+  const gap = i => i <= 0 ? 2 : Math.min(2, N[i].t - (N[i - 1].t + N[i - 1].d));
+  const INF = 1e18, dp = Array.from({ length: L }, () => new Float64Array(N.length).fill(INF));
+  const from = Array.from({ length: L }, () => new Int32Array(N.length).fill(-1));
+  const cost = (k, a, b) => Math.abs(sy[k] - (b - a + 1)) / sy[k] - (k ? gap(a) : 0);
+  for (let k = 0; k < L; k++) {
+    const maxW = sy[k] * 3 + 6;
+    for (let b = k; b < N.length - (L - 1 - k); b++) {
+      for (let a = Math.max(k, b - maxW + 1); a <= b; a++) {
+        const prev = k ? (a - 1 >= 0 ? dp[k - 1][a - 1] : INF) : (a === 0 ? 0 : INF);
+        if (prev === INF) continue;
+        const c = prev + cost(k, a, b);
+        if (c < dp[k][b]) { dp[k][b] = c; from[k][b] = a; }
+      }
+    }
+  }
+  let b = N.length - 1;
+  if (dp[L - 1][b] === INF) return null;
+  const out = [];
+  for (let k = L - 1; k >= 0; k--) {
+    const a = from[k][b];
+    out.unshift({ t0: N[a].t - 0.05, t1: N[b].t + N[b].d + 0.05, text: lines[k] });
+    b = a - 1;
+  }
+  return out;
+}
+$('lyrPlace').addEventListener('click', () => {
+  const lines = $('lyrText').value.split(/\r?\n/).map(x => x.trim()).filter(x => x && !/^\[.*\]$/.test(x));
+  if (!lines.length) { lyrStatus('Pega la letra primero, una frase por línea.', 'error'); return; }
+  if (/\[\d+:\d+/.test($('lyrText').value)) { const l = parseLRC($('lyrText').value); setLyrics(l, 'Letra sincronizada (LRC)'); lyrStatus(`${l.length} frases colocadas con sus tiempos.`); return; }
+  if (!state.notes.length) { lyrStatus('Primero analiza una canción.', 'error'); return; }
+  const al = alignPlain(lines);
+  if (!al) { lyrStatus('Hay más frases que notas. Revisa la limpieza o junta líneas.', 'error'); return; }
+  setLyrics(al, 'Colocada automáticamente');
+  lyrStatus(`${al.length} frases colocadas. Escucha y, si alguna no cuadra, usa Sincronizar a mano.`);
+});
+
+/* Búsqueda en LRCLIB */
+async function searchLyrics() {
+  const q = $('lyrQ').value.trim();
+  if (!q) { lyrStatus('Escribe el título y el artista.', 'error'); return; }
+  const ul = $('lyrResults'); ul.textContent = '';
+  lyrStatus('Buscando…'); $('lyrSearch').disabled = true;
+  try {
+    const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q));
+    if (!r.ok) throw new Error('error ' + r.status);
+    let list = await r.json();
+    list = list.filter(x => !x.instrumental && (x.syncedLyrics || x.plainLyrics));
+    const dur = state.isDemo ? 0 : state.duration;
+    list.sort((a, b) => (!!b.syncedLyrics - !!a.syncedLyrics) || (dur ? Math.abs(a.duration - dur) - Math.abs(b.duration - dur) : 0));
+    if (!list.length) { lyrStatus('No se encontró. Prueba con otra forma del título, o pega la letra.', 'error'); return; }
+    lyrStatus(`${list.length} resultados. Elige la versión que dure lo mismo que tu archivo.`);
+    for (const x of list.slice(0, 8)) {
+      const li = document.createElement('li'), b = document.createElement('button');
+      const strong = document.createElement('strong'); strong.textContent = `${x.trackName} · ${x.artistName}`;
+      if (x.syncedLyrics) { const p = document.createElement('span'); p.className = 'pill'; p.textContent = 'sincronizada'; strong.appendChild(p); }
+      const sm = document.createElement('small'); sm.textContent = `${x.albumName || 'Sin álbum'} · ${fmt(x.duration || 0)}`;
+      b.append(strong, sm);
+      b.addEventListener('click', () => pickLyrics(x));
+      li.appendChild(b); ul.appendChild(li);
+    }
+  } catch (e) {
+    lyrStatus('No se pudo consultar LRCLIB. Comprueba la conexión, o copia la letra de cualquier web y usa Pegar.', 'error');
+  } finally { $('lyrSearch').disabled = false; }
+}
+function pickLyrics(x) {
+  $('lyrResults').textContent = '';
+  if (x.syncedLyrics) {
+    const l = parseLRC(x.syncedLyrics);
+    setLyrics(l, `LRCLIB · sincronizada`);
+    const d = state.isDemo ? 0 : Math.abs((x.duration || 0) - state.duration);
+    lyrStatus(`${l.length} frases cargadas.` + (d > 3 ? ` Esta versión dura ${Math.round(d)} s distinto que tu archivo: ajusta el desfase si no cuadra.` : ''));
+  } else {
+    $('lyrText').value = x.plainLyrics; $('ls-paste').checked = true; $('ls-paste').dispatchEvent(new Event('change'));
+    lyrStatus('Esta letra no trae tiempos. Pulsa Colocar sobre las notas.');
+  }
+}
+$('lyrSearch').addEventListener('click', searchLyrics);
+$('lyrQ').addEventListener('keydown', e => { if (e.key === 'Enter') searchLyrics(); });
+
+/* Desfase global */
+function shiftLyrics(dt) {
+  state.lyrOffset = Math.round((state.lyrOffset + dt) * 100) / 100;
+  for (const l of state.lyrics) { l.t0 += dt; l.t1 += dt; }
+  $('offVal').textContent = (state.lyrOffset > 0 ? '+' : '') + state.lyrOffset.toFixed(2).replace('.', ',') + ' s';
+  refreshInfo();
+}
+$('offDown').addEventListener('click', () => shiftLyrics(-0.25));
+$('offUp').addEventListener('click', () => shiftLyrics(0.25));
+
+/* Sincronizar a mano: suena la canción y tocas al empezar cada frase. */
+function tapLabel() {
+  const l = state.lyrics[state.tap];
+  $('tapBtn').textContent = l ? `Marcar: «${l.text.length > 40 ? l.text.slice(0, 40) + '…' : l.text}»` : 'Terminar';
+}
+$('tapStart').addEventListener('click', () => {
+  if (!state.lyrics.length) return;
+  state.tap = 0; $('tapBtn').hidden = false; tapLabel();
+  lyrStatus('Toca el botón justo cuando empiece cada frase. También sirve la barra espaciadora.');
+  pause(); state.playhead = Math.max(0, state.lyrics[0].t0 - 4); startPlayback();
+});
+function tapMark() {
+  if (state.tap < 0) return;
+  const t = now() - 0.12, L = state.lyrics;
+  if (state.tap < L.length) {
+    L[state.tap].t0 = t;
+    if (state.tap > 0) L[state.tap - 1].t1 = t - 0.02;
+    state.tap++;
+  }
+  if (state.tap >= L.length) {
+    const last = L[L.length - 1], after = state.notes.filter(n => n.t >= last.t0 && n.t < last.t0 + 10);
+    last.t1 = after.length ? after[after.length - 1].t + after[after.length - 1].d + 0.05 : last.t0 + 4;
+    state.tap = -1; $('tapBtn').hidden = true; lyrStatus('Letra sincronizada.');
+  } else tapLabel();
+  refreshInfo();
+}
+$('tapBtn').addEventListener('click', tapMark);
+document.addEventListener('keydown', e => { if (state.tap >= 0 && (e.code === 'Space' || e.key === 'Enter') && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') { e.preventDefault(); tapMark(); } });
+
+/* Transcripción con Whisper (experimental) */
 $('lyrLang').value = store.get('tonalia.lang') ?? 'spanish';
 $('lyrModel').value = store.get('tonalia.model') || 'Xenova/whisper-base';
 const HALLU = /subt[ií]tul|amara\.org|suscr[ií]b|gracias por ver|thanks for watching|\[m[uú]sica\]|\(m[uú]sica\)|♪+$/i;
 let asrWorker = null;
-function lyrStatus(msg, kind) { const s = $('lyrStatus'); s.textContent = msg || ''; s.className = 'status' + (kind ? ' ' + kind : ''); }
 function voicedShare(t0, t1) {
   if (!state.curve) return 1;
   const { midi, hop } = state.curve; let v = 0, n = 0;
   for (let i = Math.floor(t0 / hop); i < Math.min(midi.length, t1 / hop); i++) { n++; if (!isNaN(midi[i])) v++; }
   return n ? v / n : 0;
 }
-function cleanLyrics(chunks) {
+function cleanChunks(chunks) {
   const out = [];
   chunks.forEach((c, i) => {
     const text = (c.text || '').trim();
     let [t0, t1] = c.timestamp || [0, null];
     if (t0 == null) return;
     if (t1 == null) t1 = chunks[i + 1] && chunks[i + 1].timestamp ? chunks[i + 1].timestamp[0] : Math.min(state.duration, t0 + 5);
-    if (!text || HALLU.test(text) || t1 <= t0) return;
-    if (voicedShare(t0, t1) < 0.12) return;
+    if (!text || HALLU.test(text) || t1 <= t0 || voicedShare(t0, t1) < 0.12) return;
     const prev = out[out.length - 1];
     if (prev && prev.text === text && t0 - prev.t1 < 0.5 && t1 - t0 < 1.5) { prev.t1 = t1; return; }
     out.push({ t0, t1, text });
   });
   return out;
 }
-function transcribe() {
-  if (!state.mono) { lyrStatus('Primero analiza una canción. El ejemplo ya trae su letra.', 'error'); return; }
+$('lyrBtn').addEventListener('click', () => {
+  if (!state.mono) { lyrStatus('Primero analiza una canción.', 'error'); return; }
   const model = $('lyrModel').value, language = $('lyrLang').value;
   store.set('tonalia.model', model); store.set('tonalia.lang', language);
   try { asrWorker = asrWorker || new Worker('letra-worker.js', { type: 'module' }); }
-  catch (e) { lyrStatus('Este navegador no puede ejecutar la transcripción. Ábrela desde la app publicada en GitHub Pages.', 'error'); return; }
-  $('lyrBtn').disabled = true;
-  const files = {};
+  catch (e) { lyrStatus('Este navegador no puede ejecutar la transcripción.', 'error'); return; }
+  $('lyrBtn').disabled = true; const files = {};
   lyrStatus('Preparando el modelo…');
-  asrWorker.onerror = () => { lyrStatus('No se pudo cargar el transcriptor. Comprueba la conexión y vuelve a intentarlo.', 'error'); $('lyrBtn').disabled = false; asrWorker = null; };
+  asrWorker.onerror = () => { lyrStatus('No se pudo cargar el transcriptor. Comprueba la conexión.', 'error'); $('lyrBtn').disabled = false; asrWorker = null; };
   asrWorker.onmessage = e => {
     const m = e.data;
     if (m.type === 'load' && m.p && m.p.status === 'progress' && m.p.total) {
       files[m.p.file] = [m.p.loaded, m.p.total];
       let a = 0, b = 0; for (const [l, t] of Object.values(files)) { a += l; b += t; }
       lyrStatus(`Descargando el modelo (solo la primera vez)… ${Math.round(a / 1048576)} de ${Math.round(b / 1048576)} MB`);
-    } else if (m.type === 'run') {
-      lyrStatus('Transcribiendo la letra… en un móvil puede tardar unos minutos.');
-    } else if (m.type === 'done') {
-      state.lyrics = cleanLyrics(m.chunks);
-      lyrStatus(state.lyrics.length ? `Letra lista: ${state.lyrics.length} frases. Toca una para saltar a ese momento.` : 'No se reconoció letra. Prueba con el modelo Preciso o eligiendo el idioma.', state.lyrics.length ? '' : 'error');
-      $('lyrBtn').disabled = false; renderLyrics(); draw();
-    } else if (m.type === 'error') {
-      lyrStatus('La transcripción falló: ' + m.message, 'error'); $('lyrBtn').disabled = false;
-    }
+    } else if (m.type === 'run') lyrStatus('Transcribiendo… en un móvil puede tardar unos minutos.');
+    else if (m.type === 'done') {
+      const l = cleanChunks(m.chunks); setLyrics(l, 'Transcrita (experimental)');
+      lyrStatus(l.length ? `${l.length} frases. Revisa el texto: con canto suele fallar.` : 'No se reconoció letra.', l.length ? '' : 'error');
+      $('lyrBtn').disabled = false;
+    } else if (m.type === 'error') { lyrStatus('La transcripción falló: ' + m.message, 'error'); $('lyrBtn').disabled = false; }
   };
   const audio = state.mono.slice();
   asrWorker.postMessage({ audio, model, language }, [audio.buffer]);
-}
-$('lyrBtn').addEventListener('click', transcribe);
+});
 
 function renderLyrics() {
   const ul = $('lyrics'); ul.textContent = ''; lastLyr = -1;
-  if (!state.lyrics.length) {
-    const p = document.createElement('li');
-    p.innerHTML = '<p class="lyr-empty">Pulsa <strong>Transcribir letra</strong> para sacar la letra con sus tiempos. Aparecerá aquí y bajo las notas.</p>';
-    ul.appendChild(p); return;
-  }
   state.lyrics.forEach(l => {
     const li = document.createElement('li'), b = document.createElement('button');
     b.innerHTML = `<span>${fmt(l.t0)}</span>`; b.appendChild(document.createTextNode(l.text));
@@ -924,54 +1220,48 @@ function syncLyric(t) {
   const ul = $('lyrics');
   if (lastLyr >= 0 && ul.children[lastLyr]) ul.children[lastLyr].firstChild.classList.remove('on');
   lastLyr = i;
-  if (i >= 0 && ul.children[i] && ul.children[i].firstChild) {
+  if (i >= 0 && ul.children[i]) {
     const el = ul.children[i]; el.firstChild.classList.add('on');
     const top = el.offsetTop - ul.offsetTop;
     if (top < ul.scrollTop || top > ul.scrollTop + ul.clientHeight - 40) ul.scrollTop = top - ul.clientHeight / 3;
   }
 }
 
-/* ---- Datos de cabecera y chips ---- */
+/* ---- Cabecera y panel "ahora" ---- */
 function refreshInfo() {
-  const ms = state.notes.map(n => n.m + state.transpose);
-  const tn = state.notes.map(n => ({ ...n, m: n.m + state.transpose }));
-  $('sKey').textContent = detectKey(tn);
+  const T = state.transpose, ms = state.notes.map(n => n.m + T);
+  $('sKey').textContent = detectKey(state.notes.map(n => ({ ...n, m: n.m + T })));
   $('sRange').textContent = ms.length ? `${noteName(Math.min(...ms))}–${noteName(Math.max(...ms))}` : '—';
   $('sCount').textContent = ms.length || '—';
   const hasVoice = !!state.vocalBuf, hasSong = !!state.origBuf;
   $('tVoice').disabled = !hasVoice; $('tSong').disabled = !hasSong;
   $('tVoice').setAttribute('aria-pressed', hasVoice && state.src.voice);
   $('tSong').setAttribute('aria-pressed', hasSong && state.src.song);
-  const chips = $('chips'); chips.textContent = '';
-  const frag = document.createDocumentFragment();
-  state.notes.forEach((n, i) => {
-    const b = document.createElement('button'); b.className = 'chip'; b.dataset.i = i;
-    b.textContent = noteName(n.m + state.transpose);
-    b.addEventListener('click', () => seek(n.t));
-    frag.appendChild(b);
-  });
-  chips.appendChild(frag);
+  $('lyrTools').hidden = !state.lyrics.length;
+  for (const l of state.lyrics) delete l.syl;
+  assignSyllables();
   renderLyrics();
+  lastNow = -2;
   draw();
 }
-let lastChip = -1;
-function syncChip(t) {
-  const i = state.notes.findIndex(n => t >= n.t && t < n.t + n.d);
-  if (i === lastChip) return;
-  const box = $('chips');
-  if (lastChip >= 0 && box.children[lastChip]) box.children[lastChip].classList.remove('on');
-  lastChip = i;
-  if (i >= 0 && box.children[i]) {
-    const el = box.children[i]; el.classList.add('on');
-    const l = el.offsetLeft - box.offsetLeft;
-    if (l < box.scrollLeft || l > box.scrollLeft + box.clientWidth - 60) box.scrollLeft = l - box.clientWidth / 3;
-  }
+let lastNow = -2;
+function syncNow(t) {
+  const N = state.notes;
+  let i = N.findIndex(n => t >= n.t && t < n.t + n.d);
+  const nextI = i >= 0 ? i + 1 : N.findIndex(n => n.t > t);
+  const key = i * 100000 + nextI;
+  if (key === lastNow) return;
+  lastNow = key;
+  const T = state.transpose, cur = N[i], nx = N[nextI];
+  $('nowNote').textContent = cur ? noteName(cur.m + T) : '—';
+  $('nowSyl').textContent = cur ? (cur.syl || '') : '';
+  $('nowNext').textContent = nx ? noteName(nx.m + T) + (nx.syl ? ' · ' + nx.syl : '') : '—';
 }
 
 function seek(t) {
   state.playhead = Math.max(0, Math.min(state.duration, t));
   const w = $('roll').clientWidth - 46, span = w / state.pxPerSec;
-  if (state.playhead < state.view || state.playhead > state.view + span) state.view = state.playhead - span * 0.25;
+  state.view = state.playhead - span * 0.25;
   if (state.playing) { pause(); startPlayback(); } else draw();
 }
 
@@ -984,12 +1274,13 @@ function draw() {
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
   const T = state.transpose, t = now();
-  const ms = state.notes.map(n => n.m + T);
-  let lo = ms.length ? Math.min(...ms) - 2 : 57, hi = ms.length ? Math.max(...ms) + 2 : 72;
-  if (hi - lo < 14) { const c = (hi + lo) / 2; lo = Math.floor(c - 7); hi = Math.ceil(c + 7); }
+  /* Rango vertical: el de las notas (percentiles 2–98), con un mínimo de octava y cuarta. */
+  const ms = state.notes.map(n => n.m + T).sort((a, b) => a - b);
+  let lo = ms.length ? ms[Math.floor(ms.length * 0.02)] - 2 : 57, hi = ms.length ? ms[Math.ceil(ms.length * 0.98) - 1] + 2 : 72;
+  if (hi - lo < 16) { const c = (hi + lo) / 2; lo = Math.floor(c - 8); hi = Math.ceil(c + 8); }
   const band = state.lyrics.length ? 30 : 0;
   const G = 46, top = 22, rows = hi - lo + 1, rh = (h - top - band) / rows;
-  const X = s => G + (s - state.view) * state.pxPerSec, Y = m => top + (hi - m) * rh;
+  const X = s => G + (s - state.view) * state.pxPerSec, Y = m => top + (hi - Math.max(lo, Math.min(hi, m))) * rh;
   const t0 = state.view, t1 = state.view + (w - G) / state.pxPerSec;
 
   g.fillStyle = col('--roll'); g.fillRect(0, 0, w, h);
@@ -997,17 +1288,15 @@ function draw() {
     if (BLACK.has(pcOf(m))) { g.fillStyle = col('--roll-alt'); g.fillRect(G, Y(m), w - G, rh); }
     if (pcOf(m) === 0) { g.fillStyle = col('--line'); g.fillRect(G, Y(m) + rh - 1, w - G, 1); }
   }
-  /* Marcas de tiempo */
   const steps = [0.5, 1, 2, 5, 10, 15, 30, 60];
   const st = steps.find(s => s * state.pxPerSec >= 70) || 60;
   g.font = `11px ${col('--f-mono')}`; g.textBaseline = 'middle';
   for (let s = Math.ceil(Math.max(0, t0) / st) * st; s <= t1; s += st) {
     const x = X(s);
-    g.fillStyle = col('--line'); g.fillRect(x, top, 1, h - top);
+    g.fillStyle = col('--line'); g.fillRect(x, top, 1, h - top - band);
     g.fillStyle = col('--muted'); g.fillText(st < 1 ? s.toFixed(1) : fmt(s), x + 4, top / 2 + 1);
   }
-  /* Curva de tono continua */
-  if (state.curve) {
+  if (state.showCurve && state.curve) {
     const { midi, hop } = state.curve;
     g.strokeStyle = col('--curve'); g.lineWidth = 1.25; g.beginPath();
     let pen = false, prev = NaN;
@@ -1021,24 +1310,25 @@ function draw() {
     }
     g.stroke();
   }
-  /* Notas */
-  const S = col('--note-s'), Lg = col('--note-l');
+  /* Notas: futuras en color, la activa resaltada, las ya cantadas apagadas. */
   let active = null;
-  g.font = `600 ${Math.max(9, Math.min(12, rh * 0.62))}px ${col('--f-body')}`;
+  const fs = Math.max(10, Math.min(14, rh * 0.7));
   for (const n of state.notes) {
     if (n.t + n.d < t0 || n.t > t1) continue;
-    const m = n.m + T, x = X(n.t), y = Y(m), wd = Math.max(2, n.d * state.pxPerSec - 1);
-    const on = t >= n.t && t < n.t + n.d; if (on) active = m;
-    g.globalAlpha = on ? 1 : 0.82;
-    g.fillStyle = `hsl(${pcOf(m) * 30} ${S} ${Lg})`;
+    const m = n.m + T, x = X(n.t), y = Y(m), wd = Math.max(3, n.d * state.pxPerSec - 2);
+    const on = t >= n.t && t < n.t + n.d, past = n.t + n.d <= t;
+    if (on) active = m;
+    g.fillStyle = on ? col('--note-on') : past ? col('--note-past') : col('--note');
+    const hh = Math.max(4, rh - 2);
     g.beginPath();
-    if (g.roundRect) g.roundRect(x, y + 1, wd, Math.max(2, rh - 2), Math.min(4, rh / 3)); else g.rect(x, y + 1, wd, Math.max(2, rh - 2));
+    if (g.roundRect) g.roundRect(x, y + 1, wd, hh, Math.min(5, hh / 2)); else g.rect(x, y + 1, wd, hh);
     g.fill();
-    if (on) { g.lineWidth = 2; g.strokeStyle = col('--ink'); g.stroke(); }
-    g.globalAlpha = 1;
-    if (wd > 28 && rh >= 11) { g.fillStyle = col('--note-text'); g.fillText(NAMES[pcOf(m)], x + 5, y + rh / 2 + 0.5); }
+    const label = n.syl || NAMES[pcOf(m)];
+    g.font = `${n.syl ? 600 : 500} ${fs}px ${col('--f-body')}`;
+    const tw = g.measureText(label).width;
+    if (tw + 8 <= wd && hh >= 11) { g.fillStyle = past ? col('--muted') : col('--note-text'); g.fillText(label, x + 4, y + 1 + hh / 2); }
+    else if (n.syl && y - fs > top - 4) { g.fillStyle = past ? col('--muted') : col('--ink'); g.fillText(label, x, y - fs * 0.45); }
   }
-  /* Letra bajo las notas */
   if (band) {
     const by = h - band;
     g.fillStyle = col('--surface'); g.fillRect(G, by, w - G, band);
@@ -1055,23 +1345,21 @@ function draw() {
       g.restore();
     }
   }
-  /* Etiquetas de notas */
   g.fillStyle = col('--surface'); g.fillRect(0, 0, G, h);
   g.fillStyle = col('--line'); g.fillRect(G - 1, 0, 1, h);
   g.font = `10.5px ${col('--f-mono')}`;
   for (let m = lo; m <= hi; m++) {
     if (!(rh >= 13 || pcOf(m) === 0 || m === active)) continue;
     const isA = m === active;
-    g.fillStyle = isA ? col('--accent') : pcOf(m) === 0 ? col('--ink') : col('--muted');
-    if (isA) g.font = `600 10.5px ${col('--f-mono')}`;
+    g.fillStyle = isA ? col('--note-on') : pcOf(m) === 0 ? col('--ink') : col('--muted');
+    if (isA) g.font = `700 10.5px ${col('--f-mono')}`;
     g.fillText(noteName(m), 5, Y(m) + rh / 2 + 0.5);
     if (isA) g.font = `10.5px ${col('--f-mono')}`;
   }
-  /* Cursor de reproducción */
   const px = X(t);
   if (px >= G) { g.fillStyle = col('--accent'); g.fillRect(px - 1, 0, 2, h); }
   $('time').textContent = `${fmt(t)} / ${fmt(state.duration)}`;
-  syncChip(t);
+  syncNow(t);
   syncLyric(t);
 }
 
@@ -1079,10 +1367,11 @@ function draw() {
 (() => {
   const cv = $('roll'); let start = null;
   cv.addEventListener('pointerdown', e => { start = { x: e.clientX, y: e.clientY, v: state.view, moved: false, id: e.pointerId }; });
+  window.addEventListener('pointerup', () => { if (dragging) { dragging = false; if (state.playing) { const v = state.view; seek(v + ($('roll').clientWidth - 46) / state.pxPerSec * 0.25); } } });
   cv.addEventListener('pointermove', e => {
     if (!start) return;
     const dx = e.clientX - start.x;
-    if (!start.moved && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - start.y)) { start.moved = true; try { cv.setPointerCapture(start.id); } catch (_) {} }
+    if (!start.moved && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(e.clientY - start.y)) { start.moved = true; dragging = true; try { cv.setPointerCapture(start.id); } catch (_) {} }
     if (start.moved) { state.view = Math.max(-1, Math.min(state.duration, start.v - dx / state.pxPerSec)); draw(); }
   });
   const end = e => {

@@ -58,6 +58,7 @@ Abre http://localhost:8000. El micrófono y la instalación como app solo funcio
 
 - [x] Subir canción, separar voz y marcar notas
 - [x] Limpieza del tono (Suave / Normal / Fuerte)
-- [x] Letra con tiempos (Whisper base o small, gratis en el navegador)
+- [x] Letra: búsqueda en LRCLIB (sincronizada), pegar letra con colocación automática, sincronizar a mano, Whisper experimental
+- [x] Sílabas sobre cada nota, panel Ahora / Siguiente y desplazamiento continuo
 - [ ] Modo práctica con micrófono (más agudo / más grave en tiempo real)
 - [ ] Juego de repetir secuencias de notas
